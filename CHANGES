@@ -1,0 +1,7 @@
+
+History Revision for Set::String:
+
+2004-11-26 v0.02 Tels 75 tests
+  * first version with new/insert/delete/exists/size/is_empty
+  * added tests, doc
+  * uses a hash, and hv_store() to share the hash elements

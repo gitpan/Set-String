@@ -1,6 +1,10 @@
-Changes
-Makefile.PL
+CHANGES
+LICENSE
 MANIFEST
 README
-String.pm
-test.pl
+SIGNATURE
+Makefile.PL
+lib/Set/String.pm
+t/stringpm.t
+t/hash.t
+META.yml                                 Module meta-data (added by MakeMaker)
