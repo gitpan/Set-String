@@ -18,6 +18,7 @@ my $s1 = Set::String->new("Hello\n\n");
 my $s2 = Set::String->new("Again\n\n");
 my $s3 = Set::String->new("World!!!");
 my $s4 = Set::String->new("2+2");
+my $s5 = Set::String->new("fee fie foe foo");
 
 ok($s1->length == 7);
 ok($s1->chop(3)->length == 4);

@@ -5,20 +5,27 @@
 ##################################################################
 package Set::String;
 use strict;
-use Carp;
+use Carp qw/croak cluck/;
 use Want;
 use Set::Array;
 use attributes qw(reftype);
 
-use subs qw(chop chomp defined eval lc lcfirst ord);
-use subs qw(uc ucfirst);
+use subs qw(chop chomp crypt defined eval index lc lcfirst ord);
+use subs qw(pos substr uc ucfirst);
 
 # Subclass of Set::Array
 BEGIN{
    use vars qw(@ISA $VERSION);
    @ISA = qw(Set::Array);
-   $VERSION = '0.01';
+   $VERSION = '0.02';
 }
+
+#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# Used to decrypt an encrypted string.  Given that there's no
+# way to access this variably directly (that I know of), I think
+# this is a fairly safe implementation.
+#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+my $decrypted;
 
 sub new{
    my($class,$string) = @_;
@@ -73,6 +80,41 @@ sub chomp{
    return scalar @chomped if defined wantarray;
 }
 
+sub crypt{
+   my($self,$salt) = @_;
+
+   croak("No salt provided to 'crypt()' method") unless $salt;
+
+   $decrypted = CORE::join('',@$self);
+   my $temp = CORE::crypt($decrypted,$salt);
+
+   if(want('OBJECT') or !(defined wantarray)){
+      @$self = split('',$temp);
+      undef $temp;
+      return $self;
+   }
+
+   return $temp;
+}
+
+sub decrypt{
+   my($self) = @_;
+
+   unless(defined $decrypted){
+      cluck("Pointless to decrypt an unencrypted string.  Ignoring");
+      if(want('OBJECT') or !(defined wantarray)){ return $self }
+      return @$self if wantarray;
+      return join('',@$self) if defined wantarray;
+   }
+
+   if(want('OBJECT') or !(defined wantarray)){
+      @$self = split('',$decrypted);
+      return $self;
+   }
+
+   return $decrypted;
+}
+
 # Returns 1 or 0
 sub defined{
    my($self) = @_;
@@ -96,6 +138,27 @@ sub eval{
       return $self;
    }
    return $result;
+}
+
+sub index{
+   my($self,$substr,$start) = @_;
+
+   croak("No substring provided to 'index()' method") unless $substr;
+
+   my $pos;
+   if(defined $start){
+      $pos = CORE::index(CORE::join('',@$self),$substr,$start);
+   }
+   else{
+      $pos = CORE::index(CORE::join('',@$self),$substr);
+   }
+
+   if(want('OBJECT') or !(defined wantarray)){
+      return bless \$pos;
+   }
+
+   return $pos if $pos;
+   return -1;
 }
 
 ###############################################################
@@ -168,6 +231,64 @@ sub ord{
 
    return @copy if wantarray;
    return \@copy if defined wantarray;
+}
+
+###########################################################################
+# Returns an index or array of indices
+#
+# e.g. if string is "fee fie foe foo" and 'e' is the pattern, 2,3,7 and 11
+# would be returned.
+###########################################################################
+sub pos{
+   my($self,$pattern) = @_;
+
+   croak("No pattern supplied to 'pos()' method") unless $pattern;
+
+   my @indices;
+   my $string = CORE::join('',@$self);
+
+   while($string =~ /$pattern/g){
+      my $pos = CORE::pos $string;
+      push @indices, $pos;
+   }
+  
+   if(want('OBJECT') or !(defined wantarray)){
+      @$self = @indices;
+      undef @indices;
+      return $self;
+   }
+
+   return @indices if wantarray;
+   return \@indices if defined wantarray;
+}
+
+sub substr{
+   my($self,$offset,$length) = @_;
+   
+   croak("No offset specified for 'substr()' method") unless defined $offset;
+
+   if( (defined $length) && ($length <= 0) ){
+      croak("Nonsensical value used as length for 'substr()' method");
+   }
+
+   my $string = CORE::join('',@$self);
+
+   my $substr;
+
+   if($length){
+      $substr = CORE::substr($string,$offset,$length);
+   }
+   else{
+      $substr = CORE::substr($string,$offset);
+   }
+
+   if( want('OBJECT') or !(defined wantarray) ){
+      @$self = CORE::split('',$substr);
+      undef $string;
+      return $self;
+   }
+
+   return $substr;
 }
 
 # Not yet implemented
@@ -313,8 +434,8 @@ C<< $so->unique(); # Object modified, now contains 'Helo' >>
 
 B<Here are the exceptions>:
 
-* Methods that report a value, such as boolean methods like I<defined()> or
-  other methods such as I<at()> or I<as_hash()>, never modify the object.
+* Methods that report a value, such as boolean methods like I<defined()>,
+  never modify the object.
 
 =head1 BOOLEAN METHODS
 
@@ -330,13 +451,24 @@ chomped.  In list context, a list of chomped values is returned.  In scalar
 context, the number of chomped values is returned.
 
 B<chop(>I<?int?>B<)> - Deletes the last character of the string.  Optionally
-you
-may pass an integer to this method to indicate the number of times you want
-the
-string chopped.  In list context, a list of chopped values is returned.  In
-scalar context, the number of chopped values is returned.
+you may pass an integer to this method to indicate the number of times you
+want the string chopped.  In list context, a list of chopped values is
+returned.  In scalar context, the number of chopped values is returned.
+
+B<crypt(>I<salt>B<)> - Encrypts the string, converting it into a 13-character
+string, with the first two characters as the I<salt>.  Unlike Perl's builtin
+I<crypt> function, you B<CAN> decrypt the object to get the original string
+using the I<decrypt()> method.
+
+B<decrypt> - Decrypts an encrypted string.  Attempting to decrypt an
+unencrypted string will generate a warning.  Returns the decrypted string
+in either list or scalar context.
 
 B<eval> - Evaluates the string and returns the result.
+
+B<index(>I<substring>B<)> - Returns the position of the first occurrence
+of I<substring> within the string.  If the index is not found, a -1 is
+returned instead.
 
 B<lc(>I<?int?>B<)> - Lower case the string.  Optionally, you may pass an
 integer
@@ -351,9 +483,32 @@ which case only that number of characters will be converted to ord values.
 An array or array ref of ord values is returned in list or scalar context,
 respectively.
 
+B<pos(>I<pattern>B<)> - Returns the location in your string where the last
+global search left off.  If more than one location is found, it will return
+an array of integers (or an array ref in scalar context).
+
+B<substr(>I<offset>,I<?length?>B<)> - Returns a substring of the object
+string, starting at I<offset> (with 0 as the first char) and continuing
+until I<length>, or the end of the string if the length is not specified.
+If the offset is negative, then it will start at the end of the string.
+
+Returns the substring in either list or scalar context.
+
 B<uc(>I<?int?>B<)> - Upper case the string.  Otherwise identical to the
-'lc()'
-method, above.
+'lc()' method, above.
+
+=head1 FAQ
+
+I<How can you decrypt an encrypted string?  How are you doing this?>
+
+When the I<crypt()> method is called, a copy of the original string is
+placed in a lexical variable within the package.  Since there's no
+way to access that variable *except* through the object (as far as I
+know), your string is secure.
+
+Note that I wouldn't rely on I<crypt()> to provide true encryption.
+For that, you ought to be using one of the more modern cryptographic
+modules.
 
 =head1 KNOWN BUGS
 
@@ -361,13 +516,12 @@ None.  Please let me know if you find any.
 
 =head1 FUTURE PLANS
 
-Add the 'pack', 'unpack', 'substr' and 'vec' methods.
+Add the 'pack', 'unpack', and 'vec' methods.
 
 Allow arguments to be passed to the 'eval()' method.  I am not sure what the
 behavior should be at that point, however.  Should it replace the string
-object?
-Should the results of that evaluation be appended to the original string?
-Ideas welcome.
+object? Should the results of that evaluation be appended to the original
+string? Ideas welcome.
 
 Add character ranges to some of the methods
 
