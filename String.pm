@@ -11,13 +11,13 @@ use Set::Array;
 use attributes qw(reftype);
 
 use subs qw(chop chomp crypt defined eval index lc lcfirst ord);
-use subs qw(pos substr uc ucfirst);
+use subs qw(pack pos substr uc ucfirst unpack);
 
 # Subclass of Set::Array
 BEGIN{
    use vars qw(@ISA $VERSION);
    @ISA = qw(Set::Array);
-   $VERSION = '0.02';
+   $VERSION = '0.03';
 }
 
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -233,6 +233,22 @@ sub ord{
    return \@copy if defined wantarray;
 }
 
+# Overload the Set::Array version of pack (and unpack)
+sub pack{
+   my($self,$template) = @_;
+
+   croak("No template provided to 'pack()' method") unless $template;
+
+   if(want('OBJECT') || !(defined wantarray)){
+      @$self = join('',@$self);
+      @$self = CORE::pack($template,@$self);
+      return $self;
+   }
+
+   my @temp = join('',@$self);
+   return CORE::pack($template,@temp);
+}
+
 ###########################################################################
 # Returns an index or array of indices
 #
@@ -292,16 +308,20 @@ sub substr{
 }
 
 # Not yet implemented
-# sub pack{}
+sub unpack{
+   my($self,$template) = @_;
+   
+   croak("No template provided to 'unpack()' method") unless $template;
 
-# Not yet implemented
-# sub unpack{}
+   if( want('OBJECT') or !(defined wantarray) ){
+      @$self = CORE::unpack($template,join('',@$self));
+      return $self;
+   }
 
-# Not yet implemented
-# sub substr{}
-
-# Not yet implemented
-#sub pos{}
+   my $temp = join('',@$self);
+   if(wantarray){ return CORE::unpack($template,$temp) }
+   if(defined wantarray){ return CORE::unpack($template,$temp) }
+}
 
 # Not yet implemented
 #sub quotemeta{}
@@ -483,6 +503,8 @@ which case only that number of characters will be converted to ord values.
 An array or array ref of ord values is returned in list or scalar context,
 respectively.
 
+B<pack(>I<template>B<)> - Packs the string according to the template provided
+
 B<pos(>I<pattern>B<)> - Returns the location in your string where the last
 global search left off.  If more than one location is found, it will return
 an array of integers (or an array ref in scalar context).
@@ -496,6 +518,10 @@ Returns the substring in either list or scalar context.
 
 B<uc(>I<?int?>B<)> - Upper case the string.  Otherwise identical to the
 'lc()' method, above.
+
+B<unpack(>I<template>B<)> - Unpacks the string according to the template.  Probably
+best used when *not* part of a chain, as your result will always be concatenated
+into one big string otherwise.
 
 =head1 FAQ
 
@@ -516,7 +542,7 @@ None.  Please let me know if you find any.
 
 =head1 FUTURE PLANS
 
-Add the 'pack', 'unpack', and 'vec' methods.
+Add the 'vec' method
 
 Allow arguments to be passed to the 'eval()' method.  I am not sure what the
 behavior should be at that point, however.  Should it replace the string
@@ -524,6 +550,10 @@ object? Should the results of that evaluation be appended to the original
 string? Ideas welcome.
 
 Add character ranges to some of the methods
+
+How about a boolean method 'palindrome'?  Perhaps a subclass of Set::String,
+called Set::String::Grammar.  It could have a series of boolean methods like
+'verb()', 'adjective()', etc.
 
 =head1 AUTHOR
 
