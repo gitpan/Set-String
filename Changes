@@ -1,0 +1,6 @@
+Revision history for Perl extension Set-String.
+
+0.01  Tue Mar 12 08:20:47 2002
+	- original version; created by h2xs 1.21 with options
+		-A -X -n String
+
